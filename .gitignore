@@ -1,0 +1,29 @@
+# IDE / Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.gemini/
+
+# Project Specific
+gemini.md
+
+# Frontend (Vite / React)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/.env
+frontend/.env.*
+frontend/.eslintcache
+
+# Backend (Python / FastAPI) - For Phase 2
+backend/venv/
+backend/env/
+backend/.venv/
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/.env
+backend/pytest_cache/
+backend/.coverage
