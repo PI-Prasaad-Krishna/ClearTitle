@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 import 'lenis/dist/lenis.css'
 
 // The interactive, scroll-driven 3D Background
-function DataParticles({ scrollYProgress }) {
+function DataParticles({ scrollYProgress, disableParallax }) {
   const count = 3000
   const group = useRef()
   const { mouse, viewport, camera } = useThree()
@@ -30,20 +30,28 @@ function DataParticles({ scrollYProgress }) {
   }, [count])
 
   useFrame(() => {
-    // Parallax mouse follow - subtle and performant
-    group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, (mouse.x * viewport.width) / 10, 0.05)
-    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, (mouse.y * viewport.height) / 10, 0.05)
+    if (!disableParallax) {
+      // Parallax mouse follow - subtle and performant
+      group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, (mouse.x * viewport.width) / 10, 0.05)
+      group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, (mouse.y * viewport.height) / 10, 0.05)
+    }
     
     // Slowed down the rotation significantly to stop it from feeling trippy
     group.current.rotation.z += 0.0002 
   })
 
   // Tie camera Z to scroll progress!
-  useFrame(() => {
-    const scroll = scrollYProgress.get()
-    // Scroll from 0 to 1 translates to camera moving through the tunnel
-    // We start at z=75 and dive deep into z=-75
-    camera.position.z = THREE.MathUtils.lerp(75, -75, scroll)
+  useFrame((state) => {
+    if (scrollYProgress) {
+      const scroll = scrollYProgress.get()
+      // Scroll from 0 to 1 translates to camera moving through the tunnel
+      // We start at z=75 and dive deep into z=-75
+      camera.position.z = THREE.MathUtils.lerp(75, -75, scroll)
+    } else {
+      // Gentle floating for Check page without scroll
+      camera.position.z = 50
+      camera.position.y = Math.sin(state.clock.elapsedTime * 0.2) * 5
+    }
   })
 
   return (
@@ -254,50 +262,89 @@ function CheckPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="relative w-full h-screen bg-obsidian flex flex-col items-center justify-center overflow-hidden selection:bg-cyan-accent selection:text-obsidian">
-      {/* Subtle, static background for performance on check page */}
-      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.2) 1px, transparent 0)', backgroundSize: '40px 40px' }}>
+    <div className="relative w-full h-screen bg-obsidian flex flex-col justify-center overflow-hidden selection:bg-cyan-accent selection:text-obsidian">
+      {/* 3D Background */}
+      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+        <Canvas camera={{ position: [0, 0, 50], fov: 60 }}>
+          <fog attach="fog" args={['#050505', 20, 80]} />
+          <DataParticles disableParallax={true} />
+        </Canvas>
+      </div>
+
+      {/* Forensic UI Accents (HUD) */}
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-40 border-[12px] md:border-[24px] border-obsidian/90 mix-blend-overlay hidden sm:block"></div>
+      <div className="fixed bottom-6 right-10 z-50 pointer-events-none text-cyan-accent text-xs font-mono opacity-40 tracking-[0.2em] hidden md:block">
+        SYS.REQ: VAHAN_API // LATENCY: 24ms // STATUS: SECURE
+      </div>
+      <div className="fixed top-1/2 left-4 -translate-y-1/2 z-50 pointer-events-none text-slate-600 text-xs font-mono tracking-[0.2em] [writing-mode:vertical-lr] rotate-180 hidden md:block">
+        CLEAR_TITLE_v1.0.0 // SEARCH_MODE
       </div>
 
       {/* Navigation */}
       <div 
-        className="absolute top-8 left-6 md:left-12 flex items-center gap-3 cursor-pointer z-20 mix-blend-difference"
+        className="absolute top-8 left-6 md:left-12 flex items-center gap-3 cursor-pointer z-50 mix-blend-difference"
         onClick={() => navigate('/')}
       >
         <img src="/favicon.svg" alt="ClearTitle Logo" className="w-8 h-8" />
-        <span className="text-xl md:text-2xl font-black tracking-widest uppercase">
+        <span className="text-xl md:text-2xl font-black tracking-widest uppercase text-white">
           Clear<span className="text-cyan-accent">Title</span>
         </span>
       </div>
 
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-3xl px-6 text-center z-10"
-      >
-        <Activity className="text-white mx-auto mb-8 opacity-50" size={48} />
-        <h2 className="text-[6vw] md:text-5xl font-black text-white mb-10 tracking-tighter uppercase">Registration Number</h2>
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-10 md:gap-12 mt-28 md:mt-0">
         
-        <div className="relative group">
-          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-none -m-1 transition-colors duration-500 group-focus-within:border-cyan-accent/50"></div>
-          <div className="relative flex items-center bg-black/50 backdrop-blur-sm p-2 border border-slate-700/50 transition-colors duration-500 group-focus-within:border-cyan-accent">
-            <input 
-              type="text" 
-              placeholder="MH01AB1234" 
-              value={plate}
-              onChange={(e) => setPlate(e.target.value.toUpperCase())}
-              className="w-full bg-transparent border-none outline-none text-white placeholder-slate-800 px-6 py-6 text-3xl md:text-5xl uppercase tracking-[0.2em] font-mono text-center selection:bg-cyan-accent selection:text-black"
-            />
-            <button className="bg-white hover:bg-cyan-accent text-obsidian font-black px-6 md:px-10 py-6 md:py-8 transition-colors duration-300 flex items-center h-full absolute right-0 top-0 bottom-0 uppercase tracking-widest text-lg">
-              <Search size={28} />
-            </button>
+        {/* Left Side: Massive Typography */}
+        <motion.div 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex-1 w-full"
+        >
+          <div className="text-cyan-accent/60 font-mono text-[10px] md:text-sm tracking-[0.3em] uppercase mb-4">
+            [ Protocol: Database Access ]
           </div>
-        </div>
-        <p className="text-slate-500 mt-8 text-sm md:text-base tracking-widest uppercase font-bold flex items-center justify-center gap-3">
-          <ShieldAlert size={18} className="text-cyan-accent" /> Secure connection to VAHAN Registry
-        </p>
-      </motion.div>
+          <h2 className="text-[14vw] md:text-[8vw] font-black leading-[0.85] tracking-tighter uppercase text-white mb-4 md:mb-6">
+            Enter<br/>Registry.
+          </h2>
+          <p className="text-sm md:text-xl font-light text-slate-400 max-w-md">
+            Direct connection to the National VAHAN Registry. Provide the exact vehicle number plate to pull forensic history.
+          </p>
+        </motion.div>
+
+        {/* Right Side: Brutalist Input */}
+        <motion.div 
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+          className="flex-1 w-full max-w-xl"
+        >
+          <div className="relative group w-full">
+            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-none -m-1 transition-colors duration-500 group-focus-within:border-cyan-accent/50"></div>
+            <div className="relative bg-black/50 backdrop-blur-sm p-4 md:p-6 border border-slate-700/50 transition-colors duration-500 group-focus-within:border-cyan-accent flex flex-col">
+              <label className="text-cyan-accent font-mono text-[10px] md:text-xs uppercase tracking-widest mb-2 opacity-80">
+                Vehicle Registration Number
+              </label>
+              <div className="flex items-center">
+                <input 
+                  type="text" 
+                  placeholder="MH01AB1234" 
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                  className="w-full bg-transparent border-none outline-none text-white placeholder-slate-800 py-3 md:py-4 text-2xl md:text-5xl uppercase tracking-[0.1em] font-mono selection:bg-cyan-accent selection:text-black"
+                />
+              </div>
+              <button className="mt-3 md:mt-4 w-full bg-white hover:bg-cyan-accent text-obsidian font-black py-3 md:py-4 transition-colors duration-300 flex items-center justify-center gap-2 md:gap-3 uppercase tracking-widest text-sm md:text-lg">
+                <Search size={20} className="md:w-6 md:h-6" /> Verify Vehicle
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 md:mt-6 flex justify-between items-center text-[10px] md:text-xs font-mono text-slate-500">
+            <span className="flex items-center gap-2"><ShieldAlert size={14} className="text-cyan-accent hidden md:block" /> SECURE TUNNEL</span>
+            <span>256-BIT ENCRYPTION</span>
+          </div>
+        </motion.div>
+
+      </div>
     </div>
   )
 }
