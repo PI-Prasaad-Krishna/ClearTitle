@@ -21,9 +21,9 @@ frontend/.eslintcache
 backend/venv/
 backend/env/
 backend/.venv/
-backend/__pycache__/
-backend/*.py[cod]
-backend/*$py.class
+__pycache__/
+*.py[cod]
+*$py.class
 backend/.env
 backend/pytest_cache/
 backend/.coverage

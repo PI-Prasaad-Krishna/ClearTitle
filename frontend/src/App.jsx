@@ -259,7 +259,131 @@ function LandingPage() {
 
 function CheckPage() {
   const [plate, setPlate] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [report, setReport] = useState(null)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
+
+  const handleSearch = async () => {
+    if (!plate) return
+    setLoading(true)
+    setError(null)
+    try {
+      // Using an environment variable for deployment safety, defaulting to localhost
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${baseUrl}/api/v1/vehicle/${plate}`)
+      if (!res.ok) throw new Error('Registry sync failed. Verify plate number.')
+      const data = await res.json()
+      setReport(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (report) {
+    const rScore = report.summary.risk_score
+    const gradeColor = rScore > 70 ? 'text-red-500' : rScore > 40 ? 'text-amber-warning' : 'text-cyan-accent'
+    
+    return (
+      <div className="relative w-full min-h-screen bg-obsidian flex flex-col pt-32 px-6 md:px-16 overflow-x-hidden selection:bg-cyan-accent selection:text-obsidian">
+        {/* Navigation */}
+        <div className="fixed top-8 left-6 md:left-12 flex items-center gap-3 cursor-pointer z-50 mix-blend-difference" onClick={() => navigate('/')}>
+          <img src="/favicon.svg" alt="ClearTitle Logo" className="w-8 h-8" />
+          <span className="text-xl md:text-2xl font-black tracking-widest uppercase text-white">Clear<span className="text-cyan-accent">Title</span></span>
+        </div>
+
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-7xl mx-auto z-10 pb-24">
+          <button onClick={() => setReport(null)} className="text-slate-400 font-mono text-xs uppercase tracking-widest hover:text-cyan-accent mb-12 flex items-center gap-2">
+            ← [ TERMINATE SESSION & RETURN ]
+          </button>
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8 border-b border-slate-800 pb-12">
+            <div>
+              <div className="text-cyan-accent font-mono text-sm tracking-[0.2em] uppercase mb-4">TARGET PLATE</div>
+              <h1 className="text-[12vw] md:text-[8vw] font-black leading-[0.85] tracking-tighter uppercase text-white">{report.plate}</h1>
+            </div>
+            <div className="text-left md:text-right">
+              <div className="text-slate-500 font-mono text-sm tracking-[0.2em] uppercase mb-4">THREAT LEVEL</div>
+              <h2 className={`text-6xl md:text-8xl font-black ${gradeColor} tracking-tighter`}>{rScore}<span className="text-3xl text-slate-600">/100</span></h2>
+              <div className="font-mono text-sm mt-2 uppercase tracking-widest">{report.summary.grade}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* VAHAN */}
+            <div className="border border-slate-800 bg-black/40 p-8">
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-6 flex justify-between">
+                VAHAN Registry
+                <span className="text-xs font-mono font-normal text-cyan-accent tracking-widest mt-2">[ {report.registry.status} ]</span>
+              </h3>
+              <div className="space-y-4 font-mono text-sm text-slate-300">
+                <div className="flex justify-between border-b border-slate-800 pb-2"><span>OWNER</span> <span className="text-white">{report.registry.data.owner_name}</span></div>
+                <div className="flex justify-between border-b border-slate-800 pb-2"><span>CLASS</span> <span className="text-white">{report.registry.data.vehicle_class}</span></div>
+                <div className="flex justify-between border-b border-slate-800 pb-2"><span>FUEL</span> <span className="text-white">{report.registry.data.fuel_type}</span></div>
+                <div className="flex justify-between border-b border-slate-800 pb-2"><span>HYPOTHECATION</span> <span className={report.registry.data.hypothecation !== 'NONE' ? 'text-amber-warning' : 'text-cyan-accent'}>{report.registry.data.hypothecation}</span></div>
+              </div>
+            </div>
+
+            {/* IIB */}
+            <div className="border border-slate-800 bg-black/40 p-8">
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-6 flex justify-between">
+                IIB Insurance
+                <span className={`text-xs font-mono font-normal tracking-widest mt-2 ${report.insurance.status === 'CLEAR' ? 'text-cyan-accent' : 'text-amber-warning'}`}>[ {report.insurance.status} ]</span>
+              </h3>
+              <div className="space-y-4 font-mono text-sm text-slate-300">
+                {report.insurance.data.claims_history.length > 0 ? (
+                  report.insurance.data.claims_history.map((claim, idx) => (
+                    <div key={idx} className="border border-red-900/50 bg-red-950/20 p-4">
+                      <div className="text-red-500 font-bold mb-2">{claim.type}</div>
+                      <div className="flex justify-between"><span>DATE</span> <span>{claim.date}</span></div>
+                      <div className="flex justify-between mt-1"><span>ESTIMATE</span> <span>₹{claim.amount.toLocaleString()}</span></div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-500 italic">No accident claims found in central database.</div>
+                )}
+              </div>
+            </div>
+
+            {/* NCRB */}
+            <div className="border border-slate-800 bg-black/40 p-8">
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-6 flex justify-between">
+                NCRB Crime Records
+                <span className={`text-xs font-mono font-normal tracking-widest mt-2 ${report.crime.status === 'CLEAR' ? 'text-cyan-accent' : 'text-red-500'}`}>[ {report.crime.status} ]</span>
+              </h3>
+              <div className="space-y-4 font-mono text-sm text-slate-300">
+                {report.crime.status === 'CRITICAL' ? (
+                  <div className="border border-red-900/50 bg-red-950/20 p-4">
+                    <div className="text-red-500 font-bold mb-2 animate-pulse">ACTIVE STOLEN FIR MATCH</div>
+                    <div className="break-words">{report.crime.data.fir_details}</div>
+                  </div>
+                ) : (
+                  <div className="text-slate-500 italic">No matching crime records found.</div>
+                )}
+              </div>
+            </div>
+
+            {/* EChallan */}
+            <div className="border border-slate-800 bg-black/40 p-8">
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-6 flex justify-between">
+                Traffic Violations
+                <span className="text-xs font-mono font-normal tracking-widest mt-2 text-cyan-accent">[ {report.traffic.status} ]</span>
+              </h3>
+              <div className="flex flex-col items-center justify-center h-32">
+                <div className="text-5xl font-black text-white mb-2">{report.traffic.data.pending_challans}</div>
+                <div className="font-mono text-sm text-slate-400 uppercase tracking-widest">Pending Challans</div>
+                {report.traffic.data.total_pending_amount > 0 && (
+                  <div className="mt-4 text-amber-warning font-mono">₹{report.traffic.data.total_pending_amount} DUES</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative w-full h-screen bg-obsidian flex flex-col justify-center overflow-hidden selection:bg-cyan-accent selection:text-obsidian">
@@ -330,11 +454,32 @@ function CheckPage() {
                   placeholder="MH01AB1234" 
                   value={plate}
                   onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                  className="w-full bg-transparent border-none outline-none text-white placeholder-slate-800 py-3 md:py-4 text-2xl md:text-5xl uppercase tracking-[0.1em] font-mono selection:bg-cyan-accent selection:text-black"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={loading}
+                  className="w-full bg-transparent border-none outline-none text-white placeholder-slate-800 py-3 md:py-4 text-2xl md:text-5xl uppercase tracking-[0.1em] font-mono selection:bg-cyan-accent selection:text-black disabled:opacity-50"
                 />
               </div>
-              <button className="mt-3 md:mt-4 w-full bg-white hover:bg-cyan-accent text-obsidian font-black py-3 md:py-4 transition-colors duration-300 flex items-center justify-center gap-2 md:gap-3 uppercase tracking-widest text-sm md:text-lg">
-                <Search size={20} className="md:w-6 md:h-6" /> Verify Vehicle
+              
+              {error && (
+                <div className="mt-2 text-red-500 font-mono text-xs uppercase tracking-widest">
+                  ERR: {error}
+                </div>
+              )}
+
+              <button 
+                onClick={handleSearch}
+                disabled={loading || !plate}
+                className="mt-3 md:mt-4 w-full bg-white hover:bg-cyan-accent disabled:bg-slate-800 disabled:text-slate-500 text-obsidian font-black py-3 md:py-4 transition-colors duration-300 flex items-center justify-center gap-2 md:gap-3 uppercase tracking-widest text-sm md:text-lg"
+              >
+                {loading ? (
+                  <span className="animate-pulse flex items-center gap-2">
+                    <Activity size={20} className="md:w-6 md:h-6" /> AGGREGATING DATA...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Search size={20} className="md:w-6 md:h-6" /> Verify Vehicle
+                  </span>
+                )}
               </button>
             </div>
           </div>
